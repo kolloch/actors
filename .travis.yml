@@ -7,4 +7,5 @@ rust:
 script:
   - cargo build --verbose
   - cargo test --verbose
+  - cargo test --release --verbose
   - cargo doc
