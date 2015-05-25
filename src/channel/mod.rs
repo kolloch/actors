@@ -20,14 +20,19 @@ impl<Message: Send> ActorRef<Message> for Sender<Message> {
 	}
 }
 
+enum ActorCellMessage<Message, Actor> {
+	Process(Message),
+	StopAndNotify(Arc<(Condvar,Mutex<Option<Actor>>)>)
+}
+
 /// A simplistic environment to run an actor in
 /// which can act as ActorRef.
 ///
 /// Currently, it still uses one thread per actor.
 pub struct ActorCell<Message, A: Actor<Message>> {
-	tx: Mutex<Sender<Option<Message>>>,
-	actor: Mutex<Option<A>>,
-	actor_var_change: Condvar
+	// TODO: clone sender instead of mutex
+	tx: Mutex<Sender<ActorCellMessage<Message, A>>>,
+	actor: Mutex<Option<A>>
 }
 
 impl<Message: Send + 'static, A: 'static + Actor<Message>> ActorCell<Message, A> {
@@ -37,26 +42,31 @@ impl<Message: Send + 'static, A: 'static + Actor<Message>> ActorCell<Message, A>
 		let (tx, rx) = channel();
 
 		let actor_lock = Mutex::new(Some(actor));
-		let actor_var_change = Condvar::new();
 
 		let ret_cell = Arc::new(ActorCell {
 			tx: Mutex::new(tx), 
-			actor: actor_lock, 
-			actor_var_change: actor_var_change
+			actor: actor_lock
 		});
 
 		let cell = ret_cell.clone();
 
 		thread::spawn( move|| {
-			let mut actor = {
-				cell.actor.lock().unwrap().take().unwrap()
-			};
-			while let Some(msg) = rx.recv().unwrap() {
-				actor.process(msg);
-			};
-			let mut actor_var = cell.actor.lock().unwrap();
-			*actor_var = Some(actor);
-			cell.actor_var_change.notify_all()
+			let mut actor = cell.actor.lock().unwrap().take().unwrap();
+
+			loop {
+				match rx.recv().unwrap() {
+					ActorCellMessage::Process(msg) => {
+						actor.process(msg);
+					},
+					ActorCellMessage::StopAndNotify(arc) => {
+						let (ref condvar, ref actor_in_mesage) = *arc;
+						let mut actor_var = actor_in_mesage.lock().unwrap();
+						*actor_var = Some(actor);
+						condvar.notify_all();
+						break;
+					},
+				}
+			}
 		});
 
 		ret_cell
@@ -64,13 +74,16 @@ impl<Message: Send + 'static, A: 'static + Actor<Message>> ActorCell<Message, A>
 
 	/// Stops the actor cell and returns the latest actor state.	
 	pub fn stop_and_join(&self) -> A {
+		let actor_arc = Arc::new((Condvar::new(), Mutex::new(None)));
+
 		{
-			self.tx.lock().unwrap().send(None).unwrap();
+			self.tx.lock().unwrap().send(ActorCellMessage::StopAndNotify(actor_arc.clone())).unwrap();
 		}
 
-		let mut actor = self.actor.lock().unwrap();
+		let (ref actor_var_change, ref actor_var) = *actor_arc;
+		let mut actor = actor_var.lock().unwrap();
 		while actor.is_none() {
-			actor = self.actor_var_change.wait(actor).unwrap();
+			actor = actor_var_change.wait(actor).unwrap();
 		}
 
 		actor.take().unwrap()
@@ -91,10 +104,11 @@ impl<Message: Send + 'static, A: 'static + Actor<Message>> ActorRef<Message> for
 			Err(..) => 
 				Err(SendError(SendErrorReason::Unreachable, msg)),
 			Ok(tx) =>
-				tx.send(Some(msg)).map_err({|err| 
+				tx.send(ActorCellMessage::Process(msg)).map_err({|err| 
 					match err {
-						mpsc::SendError(message_opt) => 
-							SendError(SendErrorReason::Unreachable, message_opt.unwrap())
+						mpsc::SendError(ActorCellMessage::Process(msg)) => 
+							SendError(SendErrorReason::Unreachable, msg),
+						_ => unreachable!()
 					}
 				}),
 		}

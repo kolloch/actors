@@ -38,9 +38,8 @@ fn test_actor_ref() {
 			.send(ForwardMessage {forward_to: count_ref.clone(), message: 3 })
 			.ok().unwrap();
 	}
-
+	
 	forwarding_cell.stop_and_join();
-
 	let counting_actor = count_cell.stop_and_join();
 	assert_eq!(counting_actor.count, 3)
 }
