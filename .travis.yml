@@ -1,10 +1,9 @@
 language: rust
 sudo: false
-matrix:
-  include:
-  	- rust: 1.0
-    - rust: stable
-    - rust: nightly
+rust:
+  - 1.0.0
+  - beta
+  - nightly
 script:
   - cargo build --verbose
   - cargo test --verbose
