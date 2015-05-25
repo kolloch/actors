@@ -8,6 +8,9 @@ A [rust](http://www.rust-lang.org/) library to provide
 
 [API Documentation](https://kolloch.github.io/actors/doc/actors/index.html)
 
+Warning: This library is in a very early stage, it is not recomended for production 
+and all APIs are subject to change.
+
 Goals:
 
 * Message-based state manipulation.
@@ -22,7 +25,7 @@ Non-Goals:
 * Transparent network communication/distribution as part of this
   library.
 
-## Usage (NOT THERE YET ;) )
+## Usage
 
 Add this to your `Cargo.toml`:
 
