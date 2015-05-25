@@ -1,0 +1,4 @@
+[package]
+name = "actors"
+version = "0.1.0"
+authors = ["Peter Kolloch <kolloch@web-app-evolution.com>"]
