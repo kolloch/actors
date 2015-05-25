@@ -1,11 +1,12 @@
 actors
 ======
 
+A [rust](http://www.rust-lang.org/) library to provide 
+[actor](http://en.wikipedia.org/wiki/Actor_model)-like message-based concurrency.
+
 [![Build Status](https://travis-ci.org/kolloch/actors.svg?branch=master)](https://travis-ci.org/kolloch/actors)
 
 [API Documentation](https://kolloch.github.io/actors/doc/actors/index.html)
-
-A rust library to provide actor-like message-based concurrency.
 
 Goals:
 
