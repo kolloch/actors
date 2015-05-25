@@ -4,6 +4,18 @@ use std::sync::Arc;
 use Actor;
 use ActorRef;
 
+#[derive(Debug)]
+pub struct CapturingActor<Message> {
+	pub last_message: Message,
+}
+
+impl<Message: Send> Actor<Message> for CapturingActor<Message> {
+	fn process(self: &mut Self, message: Message) {
+		self.last_message = message;
+	}
+}
+
+#[derive(Debug)]
 pub struct CountingActor {
 	pub count: i32,
 }
@@ -31,15 +43,17 @@ fn test_counting_actor() {
 	}
 }
 
+#[derive(Debug)]
 pub struct ForwardMessage<Message: 'static + Send, Ref: ActorRef<Message> + Sized> {
 	pub forward_to: Arc<Ref>,
 	pub message: Message,
 } 
 
+#[derive(Debug)]
 pub struct ForwardingActor;
 
 impl<Message: 'static + Send, Ref: ActorRef<Message> + Sized + Sync> Actor<ForwardMessage<Message, Ref>> for ForwardingActor {
 	fn process(&mut self, message: ForwardMessage<Message, Ref>) {
-		message.forward_to.send(message.message);
+		message.forward_to.send(message.message).ok();
 	}
 }

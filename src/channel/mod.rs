@@ -2,14 +2,23 @@
 
 use std::thread;
 use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc;
 
 use std::sync::{Arc, Mutex, Condvar};
+use std::convert::From;
 
 use Actor;
 use ActorRef;
+use {SendError, SendErrorReason};
 
 #[cfg(test)]
 mod tests;
+
+impl<Message: Send> ActorRef<Message> for Sender<Message> {
+	fn send(&self, message: Message) -> Result<(), SendError<Message>> {
+		self.send(message).map_err(SendError::from)
+	}
+}
 
 /// A simplistic environment to run an actor in
 /// which can act as ActorRef.
@@ -68,8 +77,26 @@ impl<Message: Send + 'static, A: 'static + Actor<Message>> ActorCell<Message, A>
 	}
 }
 
+impl<Message> From<mpsc::SendError<Message>> for SendError<Message> {
+	fn from(err: mpsc::SendError<Message>) -> SendError<Message> {
+		match err {
+			mpsc::SendError(message) => SendError(SendErrorReason::Unreachable, message)
+		}
+	}
+}
+
 impl<Message: Send + 'static, A: 'static + Actor<Message>> ActorRef<Message> for ActorCell<Message, A> {
-	fn send(&self, msg: Message) {
-		self.tx.lock().unwrap().send(Some(msg)).unwrap();
+	fn send(&self, msg: Message) -> Result<(), SendError<Message>> {
+		match self.tx.lock() {
+			Err(..) => 
+				Err(SendError(SendErrorReason::Unreachable, msg)),
+			Ok(tx) =>
+				tx.send(Some(msg)).map_err({|err| 
+					match err {
+						mpsc::SendError(message_opt) => 
+							SendError(SendErrorReason::Unreachable, message_opt.unwrap())
+					}
+				}),
+		}
 	}
 }

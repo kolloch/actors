@@ -9,4 +9,3 @@ repository = "https://github.com/kolloch/actors"
 readme = "README.md"
 keywords = ["actor", "concurrency", "threads", "synchronization"]
 license = "BSD-3-Clause"
-license-file = "LICENSE"
