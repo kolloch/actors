@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ActorCell","A simplistic environment to run an actor in which can act as ActorRef."]]});
