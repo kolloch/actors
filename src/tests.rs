@@ -4,6 +4,19 @@ use std::sync::Arc;
 use Actor;
 use ActorRef;
 
+#[test]
+fn test_fn_mut_as_actor() {
+	let mut counter = 0;
+	{
+		let mut func = |_| { 
+			counter+=1
+		};
+		let counter_actor: &mut Actor<i32> = &mut func;
+		counter_actor.process(2);
+	}
+	assert_eq!(counter, 1)
+}
+
 #[derive(Debug)]
 pub struct CapturingActor<Message> {
 	pub last_message: Message,

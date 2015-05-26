@@ -49,6 +49,13 @@ pub trait Actor<Message: Send>: Send {
 	fn process(&mut self, msg: Message);
 }
 
+impl<Arg: Send, Func: FnMut(Arg) + Send> Actor<Arg> for Func {
+	fn process(&mut self, msg: Arg) {
+		// let ref mut f = self;
+		self(msg);
+	}
+}
+
 pub mod channel;
 
 #[cfg(test)]

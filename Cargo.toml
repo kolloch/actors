@@ -1,6 +1,6 @@
 [package]
 name = "actors"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Peter Kolloch <kolloch@web-app-evolution.com>"]
 description = "Provides actor-like concurrency for Rust"
 documentation = "https://kolloch.github.io/actors/doc/actors/index.html"
