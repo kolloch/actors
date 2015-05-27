@@ -2,6 +2,10 @@
 
 //! Actor-like concurrency for rust.
 
+extern crate threadpool;
+
+use std::sync::Arc;
+
 /// A handle for passing messages to an actor
 /// or another message processing entity.
 ///
@@ -11,18 +15,19 @@
 /// Note: This is actual very similar to 
 /// std::sync::mpsc::Sender. Unfortunately,
 /// that is not trait but a struct.
-pub trait ActorRef<Message: Send>: Send {
+pub trait ActorRef<M: Send>: Send {
+
 	/// Send a message to the referenced actor
 	/// or message processing entity.
 	///
 	/// Depending on the type of the actorRef that might or
 	/// might not guarantee delivery of the message.
 	/// Also, the actor might not be alive anymore.
-	fn send(&self, msg: Message) -> Result<(), SendError<Message>>;
+	fn send(&self, msg: M) -> Result<(), SendError<M>>;
 
 	/// Checks whether sending a message to this actor ref
 	/// will likely work right now.
-	fn send_error_state() -> Option<SendErrorReason> {None}
+	fn send_error_state(&self) -> Option<SendErrorReason> {None}
 }
 
 /// Reason for failed send.
@@ -56,7 +61,56 @@ impl<Arg: Send, Func: FnMut(Arg) + Send> Actor<Arg> for Func {
 	}
 }
 
+/// Anything that can spawn actors.
+pub trait ActorSpawner {
+
+	/// Spawns a new actor returning an actor ref for passing messages to it.
+	fn spawn<Message,A,R>(actor: A) -> Arc<R>
+		where R: ActorRef<Message>, Message: Send + 'static, A: Actor<Message> + 'static;
+}
+
 pub mod channel;
 
 #[cfg(test)]
 pub mod tests;
+
+trait Factory {
+	type T;
+
+	fn create() -> Self::T;
+}	
+
+struct SomeFactory;
+
+impl Factory for SomeFactory {
+	type T = i32;
+
+	fn create() -> i32 {3}
+}
+
+trait GenFactory {
+	fn create<'a,T>(&self, t: T) -> &'a ActorRef<T> where T:Send;
+}	
+
+struct DeadRef;
+
+impl<T: Send> ActorRef<T> for DeadRef {
+	fn send(&self, msg: T) -> Result<(), SendError<T>> {
+		Err(SendError(SendErrorReason::Unreachable, msg))
+	}
+}
+
+struct SomeOptFactory;
+
+impl GenFactory for SomeOptFactory {
+	fn create<'a, T>(&self, t: T) -> &'a ActorRef<T> where T: Send {
+		&DeadRef
+	}
+}
+
+#[test]
+fn simple_test() {
+	let factory = SomeOptFactory;
+	let r = factory.create(2);
+	r.send(2);
+}

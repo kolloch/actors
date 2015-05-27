@@ -7,7 +7,7 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex, Condvar};
 use std::convert::From;
 
-use Actor;
+use {Actor, ActorSpawner};
 use ActorRef;
 use {SendError, SendErrorReason};
 
@@ -29,15 +29,18 @@ enum ActorCellMessage<Message, Actor> {
 /// which can act as ActorRef.
 ///
 /// Currently, it still uses one thread per actor.
-pub struct ActorCell<Message, A: Actor<Message>> {
+struct ActorCell<Message, A: Actor<Message>> {
 	// TODO: clone sender instead of mutex
 	tx: Mutex<Sender<ActorCellMessage<Message, A>>>,
 	actor: Mutex<Option<A>>
 }
 
-impl<Message: Send + 'static, A: 'static + Actor<Message>> ActorCell<Message, A> {
+pub struct SingleThreadCell;
+
+impl ActorSpawner for SingleThreadCell {
 	/// Create and ActorCell for the given actor.
-	pub fn create(actor: A) -> Arc<ActorCell<Message, A>>
+	pub fn spawn<Message, A, R>(actor: A) -> Arc<R>
+		where R: ActorRef<Message>, Message: Send + 'static, A: Actor<Message> + 'static
 	{
 		let (tx, rx) = channel();
 
@@ -70,7 +73,10 @@ impl<Message: Send + 'static, A: 'static + Actor<Message>> ActorCell<Message, A>
 		});
 
 		ret_cell
-	}
+	}	
+}
+
+impl<Message: Send + 'static, A: 'static + Actor<Message>> ActorCell<Message, A> {
 
 	/// Stops the actor cell and returns the latest actor state.	
 	pub fn stop_and_join(&self) -> A {
