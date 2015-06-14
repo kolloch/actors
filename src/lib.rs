@@ -4,7 +4,15 @@
 
 extern crate threadpool;
 
+pub mod channel;
+pub mod thread;
+
+#[cfg(test)]
+pub mod tests;
+
 use std::sync::Arc;
+use std::fmt;
+
 
 /// A handle for passing messages to an actor
 /// or another message processing entity.
@@ -15,7 +23,7 @@ use std::sync::Arc;
 /// Note: This is actual very similar to 
 /// std::sync::mpsc::Sender. Unfortunately,
 /// that is not trait but a struct.
-pub trait ActorRef<M: Send>: Send {
+pub trait ActorRef<M: Send>: Send + Sync {
 
 	/// Send a message to the referenced actor
 	/// or message processing entity.
@@ -43,9 +51,15 @@ pub enum SendErrorReason {
 	Unknown,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 /// Error for attempted send.
 pub struct SendError<Message>(SendErrorReason, Message);
+
+impl<Message> fmt::Debug for SendError<Message> {
+	fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+		formatter.write_fmt(format_args!("SendError({:?}, ...)", self.0))
+	}
+}
 
 /// An actor can process messages that are sent
 /// to it sequentially. 
@@ -61,56 +75,11 @@ impl<Arg: Send, Func: FnMut(Arg) + Send> Actor<Arg> for Func {
 	}
 }
 
-/// Anything that can spawn actors.
+/// An ActorSpawner allows spawning actors. It returns a reference counted
+/// ActorRef to communicate with the created Actor. If all references to
+/// the actor disappear, the thread should be stopped.
 pub trait ActorSpawner {
-
 	/// Spawns a new actor returning an actor ref for passing messages to it.
-	fn spawn<Message,A,R>(actor: A) -> Arc<R>
-		where R: ActorRef<Message>, Message: Send + 'static, A: Actor<Message> + 'static;
-}
-
-pub mod channel;
-
-#[cfg(test)]
-pub mod tests;
-
-trait Factory {
-	type T;
-
-	fn create() -> Self::T;
-}	
-
-struct SomeFactory;
-
-impl Factory for SomeFactory {
-	type T = i32;
-
-	fn create() -> i32 {3}
-}
-
-trait GenFactory {
-	fn create<'a,T>(&self, t: T) -> &'a ActorRef<T> where T:Send;
-}	
-
-struct DeadRef;
-
-impl<T: Send> ActorRef<T> for DeadRef {
-	fn send(&self, msg: T) -> Result<(), SendError<T>> {
-		Err(SendError(SendErrorReason::Unreachable, msg))
-	}
-}
-
-struct SomeOptFactory;
-
-impl GenFactory for SomeOptFactory {
-	fn create<'a, T>(&self, t: T) -> &'a ActorRef<T> where T: Send {
-		&DeadRef
-	}
-}
-
-#[test]
-fn simple_test() {
-	let factory = SomeOptFactory;
-	let r = factory.create(2);
-	r.send(2);
+	fn spawn<Message,A>(&self, actor: A) -> Arc<ActorRef<Message>>
+		where Message: Send + 'static, A: Actor<Message> + 'static;
 }

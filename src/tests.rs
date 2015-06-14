@@ -17,15 +17,9 @@ fn test_fn_mut_as_actor() {
 	assert_eq!(counter, 1)
 }
 
-#[derive(Debug)]
-pub struct CapturingActor<Message> {
-	pub last_message: Message,
-}
-
-impl<Message: Send> Actor<Message> for CapturingActor<Message> {
-	fn process(self: &mut Self, message: Message) {
-		self.last_message = message;
-	}
+pub enum CountingMessage {
+	Count,
+	GetCount(Arc<ActorRef<i32>>)
 }
 
 #[derive(Debug)]
@@ -33,9 +27,13 @@ pub struct CountingActor {
 	pub count: i32,
 }
 
-impl<Message: Send> Actor<Message> for CountingActor {
-	fn process(self: &mut Self, _: Message) {
-		self.count += 1;
+impl Actor<CountingMessage> for CountingActor {
+	fn process(self: &mut Self, msg: CountingMessage) {
+		match msg {
+			CountingMessage::Count            => { self.count += 1; },
+			CountingMessage::GetCount(sender) => { sender.send(self.count).unwrap(); }
+		}
+		
 	}
 }
 
@@ -45,10 +43,10 @@ fn test_counting_actor() {
 	{
 		let handle = thread::spawn( move|| {
 			{
-				let mut actor: &mut Actor<i32> = &mut counting_actor;
-				actor.process(1);
-				actor.process(2);
-				actor.process(3);
+				let mut actor: &mut Actor<CountingMessage> = &mut counting_actor;
+				actor.process(CountingMessage::Count);
+				actor.process(CountingMessage::Count);
+				actor.process(CountingMessage::Count);
 			}
 			assert_eq!(counting_actor.count, 3)
 		});
@@ -56,17 +54,16 @@ fn test_counting_actor() {
 	}
 }
 
-#[derive(Debug)]
-pub struct ForwardMessage<Message: 'static + Send, Ref: ActorRef<Message> + Sized> {
-	pub forward_to: Arc<Ref>,
+pub struct ForwardMessage<Message: 'static + Send> {
+	pub forward_to: Arc<ActorRef<Message>>,
 	pub message: Message,
 } 
 
 #[derive(Debug)]
 pub struct ForwardingActor;
 
-impl<Message: 'static + Send, Ref: ActorRef<Message> + Sized + Sync> Actor<ForwardMessage<Message, Ref>> for ForwardingActor {
-	fn process(&mut self, message: ForwardMessage<Message, Ref>) {
+impl<Message: 'static + Send,> Actor<ForwardMessage<Message>> for ForwardingActor {
+	fn process(&mut self, message: ForwardMessage<Message>) {
 		message.forward_to.send(message.message).ok();
 	}
 }
