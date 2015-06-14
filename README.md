@@ -1,3 +1,4 @@
+[![Stories in Ready](https://badge.waffle.io/kolloch/actors.png?label=ready&title=Ready)](https://waffle.io/kolloch/actors)
 actors
 ======
 
