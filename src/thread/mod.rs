@@ -23,13 +23,13 @@ enum ActorCellMessage<Message> {
 /// which can act as ActorRef.
 ///
 /// Currently, it still uses one thread per actor.
-struct ActorCell<Message, A: Actor<Message>> {
+struct ActorCell<Message: Send, A: Actor<Message>> {
 	// TODO: clone sender instead of mutex
 	tx: Mutex<Sender<ActorCellMessage<Message>>>,
 	actor: Mutex<Option<A>>
 }
 
-impl<Message, A: Actor<Message>> Drop for ActorCell<Message, A> {
+impl<Message: Send, A: Actor<Message>> Drop for ActorCell<Message, A> {
 	fn drop(&mut self) {
 		// FIXME: Is it clever that we might panic in Drop?
 		self.tx.lock().unwrap().send(ActorCellMessage::StopAndNotify).unwrap();
