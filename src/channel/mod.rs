@@ -2,7 +2,7 @@
 
 use std::sync::mpsc;
 use std::fmt::{self, Debug, Formatter};
-use {ActorRef, ActorRefEnum, ActorRefImpl, SendError, SendErrorReason};
+use {ActorRef, ActorRefEnum, ActorRefImpl, SendError};
 
 /// An ActorRef which forwards its messages to a channel
 pub struct SenderActorRef<Message>(mpsc::Sender<Message>);
@@ -10,12 +10,7 @@ pub struct SenderActorRef<Message>(mpsc::Sender<Message>);
 impl<Message: Send + 'static> ActorRefImpl<Message> for SenderActorRef<Message> {
 	fn send(&self, msg: Message) -> Result<(), SendError<Message>> {
 		let &SenderActorRef(ref tx) = self;
-		tx.send(msg).map_err({|err|
-			match err {
-				mpsc::SendError(msg) =>
-					SendError(SendErrorReason::Unreachable, msg),
-			}
-		})
+		Ok(try!(tx.send(msg)))
 	}
 }
 

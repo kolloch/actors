@@ -4,13 +4,13 @@ use {ActorSpawner};
 
 use tests::{CountingActor, CountingMessage, ForwardingActor, ForwardMessage};
 
-use thread::{DedicatedThreadSpawner};
+use js_pool::{WorkPoolSpawner};
 use channel::channel_actor_ref;
 
 #[test]
 fn test_counting_actor_with_dedicated_thread() {
 	let counting_actor = CountingActor { count: 0 };
-	let spawner = DedicatedThreadSpawner;
+	let spawner = WorkPoolSpawner::new();
 	let actor_ref = spawner.spawn(counting_actor);
 
 	actor_ref.send(CountingMessage::Count).unwrap();
@@ -26,7 +26,7 @@ fn test_counting_actor_with_dedicated_thread() {
 #[test]
 fn test_actor_ref() {
 	let counting_actor = CountingActor { count: 0 };
-	let spawner = DedicatedThreadSpawner;
+	let spawner = WorkPoolSpawner::new();
 	let count_cell = spawner.spawn(counting_actor);
 
 	println!("1");

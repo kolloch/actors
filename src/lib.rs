@@ -5,22 +5,23 @@
 #[macro_use]
 extern crate log;
 
-// #[cfg(feature = "js-spawn")]
-// extern crate jobsteal;
-
 #[cfg(feature = "channel")]
 pub mod channel;
 
 #[cfg(feature = "thread")]
 pub mod thread;
 
-// #[cfg(feature = "js-spawn")]
-// pub mod js_spawn;
+#[cfg(feature = "jobsteal")]
+extern crate jobsteal;
+
+#[cfg(feature = "jobsteal")]
+pub mod js_pool;
 
 #[cfg(test)]
 pub mod tests;
 
 use std::fmt;
+use std::sync::mpsc;
 
 /// Contains all variants of ActoRefs which are then hidden
 /// in the pub stuct `ActorRef` as private field.
@@ -33,6 +34,8 @@ enum ActorRefEnum<M: 'static + Send> {
 	Channel(channel::SenderActorRef<M>),
 	#[cfg(feature = "thread")]
 	DedicatedThread(thread::ActorCell<M>),
+	#[cfg(feature = "jobsteal")]
+	InJobStealPool(js_pool::ActorCell<M>),
 }
 
 /// Corresponds to the public interface of ActorRef.
@@ -64,6 +67,8 @@ impl<M: 'static + Send> ActorRef<M> {
 			&ActorRefEnum::Channel(ref sender) => sender.send(msg),
 			#[cfg(feature = "thread")]
 			&ActorRefEnum::DedicatedThread(ref cell) => cell.send(msg),
+			#[cfg(feature = "jobsteal")]
+			&ActorRefEnum::InJobStealPool(ref cell) => cell.send(msg),
 		}
 	}
 }
@@ -76,6 +81,8 @@ impl<Message: Send + 'static> fmt::Debug for ActorRef<Message> {
 			&ActorRefEnum::Channel(ref sender) => write!(f, "ActorRef({:?})", sender),
 			#[cfg(feature = "thread")]
 			&ActorRefEnum::DedicatedThread(ref cell) => write!(f, "ActorRef({:?})", cell),
+			#[cfg(feature = "jobsteal")]
+			&ActorRefEnum::InJobStealPool(ref cell) => write!(f, "ActorRef({:?})", cell),
 		}
 	}
 }
@@ -90,6 +97,9 @@ impl<Message: Send + 'static> Clone for ActorRef<Message> {
 			#[cfg(feature = "thread")]
 			&ActorRefEnum::DedicatedThread(ref cell) =>
 				ActorRefEnum::DedicatedThread(cell.clone()),
+			#[cfg(feature = "jobsteal")]
+			&ActorRefEnum::InJobStealPool(ref cell) =>
+				ActorRefEnum::InJobStealPool(cell.clone()),
 		};
 		ActorRef(variant)
 	}
@@ -112,6 +122,14 @@ pub enum SendErrorReason {
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// Error for attempted send.
 pub struct SendError<Message>(SendErrorReason, Message);
+
+impl<Message> From<mpsc::SendError<Message>> for SendError<Message> {
+	fn from(err: mpsc::SendError<Message>) -> SendError<Message> {
+		match err {
+			mpsc::SendError(message) => SendError(SendErrorReason::Unreachable, message)
+		}
+	}
+}
 
 impl<Message> fmt::Debug for SendError<Message> {
 	fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {

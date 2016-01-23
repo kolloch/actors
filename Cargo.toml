@@ -19,8 +19,7 @@ env_logger = "0.3"
 
 [features]
 # Enable all features by default
-default = ["channel", "thread"]
+default = ["channel", "thread", "jobsteal"]
 # Allow spawning actors on a ForkJoinPool
 channel = []
 thread = []
-js-spawn = ["jobsteal"]

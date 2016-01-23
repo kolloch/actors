@@ -2,15 +2,13 @@
 
 use std::thread;
 use std::sync::mpsc::{channel, Sender};
-use std::sync::mpsc;
 
 use std::sync::{Arc, Mutex};
-use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 
 use {Actor, ActorSpawner};
 use {ActorRef, ActorRefImpl, ActorRefEnum};
-use {SendError, SendErrorReason};
+use {SendError};
 
 #[cfg(test)]
 mod tests;
@@ -66,20 +64,9 @@ impl ActorSpawner for DedicatedThreadSpawner {
 	}
 }
 
-impl<Message> From<mpsc::SendError<Message>> for SendError<Message> {
-	fn from(err: mpsc::SendError<Message>) -> SendError<Message> {
-		match err {
-			mpsc::SendError(message) => SendError(SendErrorReason::Unreachable, message)
-		}
-	}
-}
-
 impl<Message: Send + 'static> ActorRefImpl<Message> for ActorCell<Message> {
 	fn send(&self, msg: Message) -> Result<(), SendError<Message>> {
-		self.tx.send(msg).map_err(|err| {
-			let mpsc::SendError(msg) = err;
-			SendError(SendErrorReason::Unreachable, msg)
-		})
+		Ok(try!(self.tx.send(msg)))
 	}
 }
 
