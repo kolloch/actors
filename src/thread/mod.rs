@@ -14,7 +14,7 @@ use {SendError, SendErrorReason};
 #[cfg(test)]
 mod tests;
 
-enum ActorCellMessage<Message> {
+enum ActorCellMessage<Message> where Message: Send {
 	Process(Message),
 	StopAndNotify
 }
@@ -23,13 +23,13 @@ enum ActorCellMessage<Message> {
 /// which can act as ActorRef.
 ///
 /// Currently, it still uses one thread per actor.
-struct ActorCell<Message, A: Actor<Message>> {
+struct ActorCell<Message, A: Actor<Message>> where Message: Send {
 	// TODO: clone sender instead of mutex
 	tx: Mutex<Sender<ActorCellMessage<Message>>>,
 	actor: Mutex<Option<A>>
 }
 
-impl<Message, A: Actor<Message>> Drop for ActorCell<Message, A> {
+impl<Message, A: Actor<Message>> Drop for ActorCell<Message, A> where Message: Send {
 	fn drop(&mut self) {
 		// FIXME: Is it clever that we might panic in Drop?
 		self.tx.lock().unwrap().send(ActorCellMessage::StopAndNotify).unwrap();
@@ -50,7 +50,7 @@ impl ActorSpawner for DedicatedThreadSpawner {
 		let actor_lock = Mutex::new(Some(actor));
 
 		let ret_cell = Arc::new(ActorCell {
-			tx: Mutex::new(tx), 
+			tx: Mutex::new(tx),
 			actor: actor_lock
 		});
 
@@ -72,7 +72,7 @@ impl ActorSpawner for DedicatedThreadSpawner {
 		});
 
 		ret_cell
-	}	
+	}
 }
 
 impl<Message> From<mpsc::SendError<Message>> for SendError<Message> {
@@ -86,12 +86,12 @@ impl<Message> From<mpsc::SendError<Message>> for SendError<Message> {
 impl<Message: Send + 'static, A: 'static + Actor<Message>> ActorRef<Message> for ActorCell<Message, A> {
 	fn send(&self, msg: Message) -> Result<(), SendError<Message>> {
 		match self.tx.lock() {
-			Err(..) => 
+			Err(..) =>
 				Err(SendError(SendErrorReason::Unreachable, msg)),
 			Ok(tx) =>
-				tx.send(ActorCellMessage::Process(msg)).map_err({|err| 
+				tx.send(ActorCellMessage::Process(msg)).map_err({|err|
 					match err {
-						mpsc::SendError(ActorCellMessage::Process(msg)) => 
+						mpsc::SendError(ActorCellMessage::Process(msg)) =>
 							SendError(SendErrorReason::Unreachable, msg),
 						_ => unreachable!()
 					}
