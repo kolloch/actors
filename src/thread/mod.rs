@@ -14,7 +14,7 @@ use {SendError, SendErrorReason};
 #[cfg(test)]
 mod tests;
 
-enum ActorCellMessage<Message> where Message: Send {
+enum ActorCellMessage<Message: Send> {
 	Process(Message),
 	StopAndNotify
 }
@@ -23,7 +23,7 @@ enum ActorCellMessage<Message> where Message: Send {
 /// which can act as ActorRef.
 ///
 /// Currently, it still uses one thread per actor.
-struct ActorCell<Message, A: Actor<Message>> where Message: Send {
+struct ActorCell<Message: Send, A: Actor<Message>> {
 	// TODO: clone sender instead of mutex
 	tx: Mutex<Sender<ActorCellMessage<Message>>>,
 	actor: Mutex<Option<A>>
