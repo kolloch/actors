@@ -11,4 +11,16 @@ keywords = ["actor", "concurrency", "threads", "synchronization"]
 license = "BSD-3-Clause"
 
 [dependencies]
-threadpool = "0.1"
+jobsteal = {version = "0.2.4", optional = true}
+log = "0.3"
+
+[dev-dependencies]
+env_logger = "0.3"
+
+[features]
+# Enable all features by default
+default = ["channel", "thread"]
+# Allow spawning actors on a ForkJoinPool
+channel = []
+thread = []
+js-spawn = ["jobsteal"]

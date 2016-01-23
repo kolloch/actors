@@ -2,28 +2,54 @@
 
 //! Actor-like concurrency for rust.
 
-extern crate threadpool;
+#[macro_use]
+extern crate log;
 
+// #[cfg(feature = "js-spawn")]
+// extern crate jobsteal;
+
+#[cfg(feature = "channel")]
 pub mod channel;
+
+#[cfg(feature = "thread")]
 pub mod thread;
+
+// #[cfg(feature = "js-spawn")]
+// pub mod js_spawn;
 
 #[cfg(test)]
 pub mod tests;
 
-use std::sync::Arc;
 use std::fmt;
 
+/// Contains all variants of ActoRefs which are then hidden
+/// in the pub stuct `ActorRef` as private field.
+///
+/// With this pattern, we allow stack allocated `ActorRef`s of
+/// different types.
+#[derive(Clone, Debug)]
+enum ActorRefEnum<M: 'static + Send> {
+	#[cfg(feature = "channel")]
+	Channel(channel::SenderActorRef<M>),
+	#[cfg(feature = "thread")]
+	DedicatedThread(thread::ActorCell<M>),
+}
+
+/// Corresponds to the public interface of ActorRef.
+/// `ActorRefEnum` variants can implement this interface to ensure
+/// that the forwarding method calls in `ActorRefEnum` are easy to implement.
+trait ActorRefImpl<M: 'static + Send>: Send + Clone + fmt::Debug {
+	fn send(&self, msg: M) -> Result<(), SendError<M>>;
+}
 
 /// A handle for passing messages to an actor
 /// or another message processing entity.
 ///
 /// All communication between actors should
 /// use this interface.
-/// 
-/// Note: This is actual very similar to 
-/// std::sync::mpsc::Sender. Unfortunately,
-/// that is not trait but a struct.
-pub trait ActorRef<M: Send>: Send + Sync {
+pub struct ActorRef<M: 'static + Send>(ActorRefEnum<M>);
+
+impl<M: 'static + Send> ActorRef<M> {
 
 	/// Send a message to the referenced actor
 	/// or message processing entity.
@@ -31,12 +57,44 @@ pub trait ActorRef<M: Send>: Send + Sync {
 	/// Depending on the type of the actorRef that might or
 	/// might not guarantee delivery of the message.
 	/// Also, the actor might not be alive anymore.
-	fn send(&self, msg: M) -> Result<(), SendError<M>>;
-
-	/// Checks whether sending a message to this actor ref
-	/// will likely work right now.
-	fn send_error_state(&self) -> Option<SendErrorReason> {None}
+	pub fn send(&self, msg: M) -> Result<(), SendError<M>> {
+		let &ActorRef(ref variant) = self;
+		match variant {
+			#[cfg(feature = "channel")]
+			&ActorRefEnum::Channel(ref sender) => sender.send(msg),
+			#[cfg(feature = "thread")]
+			&ActorRefEnum::DedicatedThread(ref cell) => cell.send(msg),
+		}
+	}
 }
+
+impl<Message: Send + 'static> fmt::Debug for ActorRef<Message> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+		let &ActorRef(ref variant) = self;
+		match variant {
+			#[cfg(feature = "channel")]
+			&ActorRefEnum::Channel(ref sender) => write!(f, "ActorRef({:?})", sender),
+			#[cfg(feature = "thread")]
+			&ActorRefEnum::DedicatedThread(ref cell) => write!(f, "ActorRef({:?})", cell),
+		}
+	}
+}
+
+impl<Message: Send + 'static> Clone for ActorRef<Message> {
+	fn clone(&self) -> ActorRef<Message> {
+		let &ActorRef(ref variant) = self;
+		let variant = match variant {
+			#[cfg(feature = "channel")]
+			&ActorRefEnum::Channel(ref sender) =>
+				ActorRefEnum::Channel(sender.clone()),
+			#[cfg(feature = "thread")]
+			&ActorRefEnum::DedicatedThread(ref cell) =>
+				ActorRefEnum::DedicatedThread(cell.clone()),
+		};
+		ActorRef(variant)
+	}
+}
+
 
 /// Reason for failed send.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -62,9 +120,9 @@ impl<Message> fmt::Debug for SendError<Message> {
 }
 
 /// An actor can process messages that are sent
-/// to it sequentially. 
+/// to it sequentially.
 pub trait Actor<Message: Send>: Send {
-	/// Process one message, update state 
+	/// Process one message, update state
 	fn process(&mut self, msg: Message);
 }
 
@@ -80,6 +138,6 @@ impl<Arg: Send, Func: FnMut(Arg) + Send> Actor<Arg> for Func {
 /// the actor disappear, the thread should be stopped.
 pub trait ActorSpawner {
 	/// Spawns a new actor returning an actor ref for passing messages to it.
-	fn spawn<Message,A>(&self, actor: A) -> Arc<ActorRef<Message>>
+	fn spawn<Message,A>(&self, actor: A) -> ActorRef<Message>
 		where Message: Send + 'static, A: Actor<Message> + 'static;
 }

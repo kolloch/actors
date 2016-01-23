@@ -1,5 +1,4 @@
 use std::thread;
-use std::sync::Arc;
 
 use Actor;
 use ActorRef;
@@ -8,7 +7,7 @@ use ActorRef;
 fn test_fn_mut_as_actor() {
 	let mut counter = 0;
 	{
-		let mut func = |_| { 
+		let mut func = |_| {
 			counter+=1
 		};
 		let counter_actor: &mut Actor<i32> = &mut func;
@@ -19,7 +18,7 @@ fn test_fn_mut_as_actor() {
 
 pub enum CountingMessage {
 	Count,
-	GetCount(Arc<ActorRef<i32>>)
+	GetCount(ActorRef<i32>)
 }
 
 #[derive(Debug)]
@@ -28,12 +27,18 @@ pub struct CountingActor {
 }
 
 impl Actor<CountingMessage> for CountingActor {
-	fn process(self: &mut Self, msg: CountingMessage) {
+	fn process(&mut self, msg: CountingMessage) {
 		match msg {
-			CountingMessage::Count            => { self.count += 1; },
-			CountingMessage::GetCount(sender) => { sender.send(self.count).unwrap(); }
+			CountingMessage::Count            => {
+				debug!("count");
+				self.count += 1;
+			},
+			CountingMessage::GetCount(sender) => {
+				debug!("get count");
+				sender.send(self.count).expect("while responding with count");
+			}
 		}
-		
+
 	}
 }
 
@@ -55,15 +60,16 @@ fn test_counting_actor() {
 }
 
 pub struct ForwardMessage<Message: 'static + Send> {
-	pub forward_to: Arc<ActorRef<Message>>,
+	pub forward_to: ActorRef<Message>,
 	pub message: Message,
-} 
+}
 
 #[derive(Debug)]
 pub struct ForwardingActor;
 
-impl<Message: 'static + Send,> Actor<ForwardMessage<Message>> for ForwardingActor {
+impl<Message: 'static + Send> Actor<ForwardMessage<Message>> for ForwardingActor {
 	fn process(&mut self, message: ForwardMessage<Message>) {
+		debug!("forward");
 		message.forward_to.send(message.message).ok();
 	}
 }
