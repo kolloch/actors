@@ -1,6 +1,14 @@
 actors
 ======
 
+WARNING: Abondoned. I am not planning to work on this anymore.
+
+Look at [tokio](https://github.com/tokio-rs/tokio) and
+the underlying [futures](https://github.com/alexcrichton/futures-rs)
+for nice event loop based concurrency paradigms.
+
+--
+
 A [rust](http://www.rust-lang.org/) library to provide 
 [actor](http://en.wikipedia.org/wiki/Actor_model)-like message-based concurrency.
  
