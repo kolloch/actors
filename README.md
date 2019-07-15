@@ -1,7 +1,7 @@
 actors
 ======
 
-WARNING: Abondoned. I am not planning to work on this anymore.
+WARNING: Abandoned. I am not planning to work on this anymore.
 
 Look at [tokio](https://github.com/tokio-rs/tokio) and
 the underlying [futures](https://github.com/alexcrichton/futures-rs)
