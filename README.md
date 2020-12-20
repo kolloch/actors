@@ -12,9 +12,6 @@ for nice event loop based concurrency paradigms.
 A [rust](http://www.rust-lang.org/) library to provide 
 [actor](http://en.wikipedia.org/wiki/Actor_model)-like message-based concurrency.
  
-[![Stories in Ready](https://badge.waffle.io/kolloch/actors.png?label=ready&title=Stories%20Ready)](https://waffle.io/kolloch/actors)
-[![Stories in Progress](https://badge.waffle.io/kolloch/actors.png?label=in%20progress&title=Stories%20In%20Progress)](https://waffle.io/kolloch/actors)
-
 [![Build Status](https://travis-ci.org/kolloch/actors.svg?branch=master)](https://travis-ci.org/kolloch/actors)
 
 [API Documentation](https://kolloch.github.io/actors/doc/actors/index.html)
